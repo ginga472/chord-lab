@@ -62,6 +62,7 @@ svg.staff ellipse{fill:var(--paper);stroke:var(--ink);stroke-width:2.2}
 svg.staff .user ellipse,svg.staff .user.acc{stroke:var(--accent)} svg.staff .user .acc{fill:var(--accent)}
 svg.staff .ok ellipse{stroke:var(--ok)} svg.staff .ok .acc{fill:var(--ok)}
 svg.staff .bad ellipse{stroke:var(--bad)} svg.staff .bad .acc{fill:var(--bad)}
+svg.staff .lhn ellipse{stroke:var(--miss)}
 svg.staff .ghost ellipse{stroke:var(--muted);stroke-dasharray:3 2}
 svg.staff .ghost .acc{fill:var(--muted)}
 .kbwrap{overflow-x:auto}
@@ -98,6 +99,13 @@ tbody tr{cursor:pointer}
 tbody tr:hover td{background:var(--bg)}
 .mode[hidden]{display:none!important}
 footer{color:var(--muted);font-size:.82rem}
+@media (max-width:480px){.modetabs{display:grid;grid-template-columns:repeat(4,auto);width:100%}.modetabs button{padding:8px 6px;font-size:.92rem}}
+.pgroup{display:grid;gap:6px}
+.pgroup .cap,.cap{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.prog-chips button,#p-dia button{display:grid;justify-items:center;gap:0;min-width:56px;padding:6px 10px;line-height:1.2}
+.prog-chips small,#p-dia small{font-size:.75rem;opacity:.75;font-family:var(--display)}
+.prog-chips span,#p-dia span{font-weight:600}
+details.keypick summary{cursor:pointer;color:var(--muted);font-weight:500}
 #b-accs .tabs button{font-family:var(--music);font-size:1.25rem;padding:2px 16px}
 @media (max-width:560px){th:nth-child(3),td:nth-child(3){display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -106,10 +114,11 @@ footer{color:var(--muted);font-size:.82rem}
 <main>
 <header>
   <h1>Chord Lab</h1>
-  <div class="tabs" role="tablist" aria-label="Mode">
+  <div class="tabs modetabs" role="tablist" aria-label="Mode">
     <button id="tab-learn" role="tab" aria-pressed="true">Learn</button>
     <button id="tab-build" role="tab" aria-pressed="false">Build it</button>
     <button id="tab-name" role="tab" aria-pressed="false">Name it</button>
+    <button id="tab-prog" role="tab" aria-pressed="false">Progressions</button>
   </div>
 </header>
 
@@ -204,6 +213,39 @@ footer{color:var(--muted);font-size:.82rem}
   </div>
 </section>
 
+<!-- PROGRESSIONS -->
+<section class="mode" id="mode-prog" hidden>
+  <div class="panel">
+    <div class="pgroup"><span class="cap">From your practice</span><div class="row" id="p-yours"></div></div>
+    <div class="pgroup"><span class="cap">Other common ones</span><div class="row" id="p-common"></div></div>
+  </div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div><div class="prompt" id="p-title"></div><div class="muted" id="p-key"></div></div>
+      <button class="primary" id="p-play">▶ Play</button>
+    </div>
+    <div class="row prog-chips" id="p-chips"></div>
+    <div class="row">
+      <label class="tempo" for="p-bpm">Tempo <input id="p-bpm" type="range" min="50" max="140" value="84"> <span id="p-bpmv">84</span> bpm</label>
+      <label class="tempo" for="p-loop"><input type="checkbox" id="p-loop" checked> Loop</label>
+    </div>
+    <p id="p-why"></p>
+    <p class="muted" id="p-songs"></p>
+    <div class="staves">
+      <div class="staffbox"><span class="cap">Right hand · nearest inversion</span><div id="p-treble"></div></div>
+      <div class="staffbox"><span class="cap">Left hand · root</span><div id="p-bass"></div></div>
+    </div>
+    <div class="kbwrap" id="p-kb"></div>
+    <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>Right hand</span><span><span class="sw" style="background:var(--miss)"></span>Left hand</span></div>
+    <details class="keypick"><summary>Change key</summary><div class="row" id="p-keys" style="padding-top:10px"></div></details>
+  </div>
+  <div class="panel">
+    <h2 id="p-dia-title"></h2>
+    <p class="muted" id="p-dia-help"></p>
+    <div class="row" id="p-dia"></div>
+  </div>
+</section>
+
 <footer>Works offline. Your settings are saved in this browser.</footer>
 </main>
 
@@ -282,9 +324,9 @@ function staffD(svg,ev,clef){
 }
 
 // ---------- keyboard drawing ----------
-const KR={treble:[53,84],bass:[36,67],all:[36,84]},WW=22,WH=104,BW=13,BH=64;
+const KR={treble:[53,84],bass:[36,67],all:[36,84],prog:[41,81]},WW=22,WH=104,BW=13,BH=64;
 const isBlack=m=>[1,3,6,8,10].includes(m%12);
-const KCOL={user:"var(--accent)",ok:"var(--ok)",bad:"var(--bad)",miss:"var(--miss)"};
+const KCOL={lh:"var(--miss)",user:"var(--accent)",ok:"var(--ok)",bad:"var(--bad)",miss:"var(--miss)"};
 function kbSVG(marks,opt){
   opt=opt||{};const [LO,HI]=KR[opt.range||'all'];let x=0,pos={},whites=[];
   for(let m=LO;m<=HI;m++){if(!isBlack(m)){pos[m]=x;whites.push(m);x+=WW}else pos[m]=x-BW/2}
@@ -332,10 +374,10 @@ function randomChord(prev){
 
 // ---------- modes ----------
 let mode="learn";
-function setMode(m){mode=m;["learn","build","name"].forEach(k=>{$("tab-"+k).setAttribute("aria-pressed",k===m);$("mode-"+k).hidden=k!==m});
-  $("settings").hidden=m==="learn";
+function setMode(m){mode=m;if(m!=="prog"&&typeof stopProg==="function")stopProg();["learn","build","name","prog"].forEach(k=>{$("tab-"+k).setAttribute("aria-pressed",k===m);$("mode-"+k).hidden=k!==m});
+  $("settings").hidden=m==="learn"||m==="prog";
   if(m==="build"&&!B.c)newBuild();if(m==="name"&&!N.c){buildNameButtons();newName()}}
-["learn","build","name"].forEach(k=>$("tab-"+k).onclick=()=>setMode(k));
+["learn","build","name","prog"].forEach(k=>$("tab-"+k).onclick=()=>setMode(k));
 
 // ----- LEARN -----
 const L={root:R(0,0),q:"maj7"};
@@ -468,6 +510,84 @@ $("n-check").onclick=()=>{
 };
 $("n-hear").onclick=()=>playMidis(N.notes.map(midiOf));
 $("n-next").onclick=newName;
+
+// ----- PROGRESSIONS -----
+const MAJ_SC=[0,2,4,5,7,9,11],MIN_SC=[0,2,3,5,7,8,10];
+const MAJ_Q=["maj","min","min","maj","maj","min","dim"],MIN_Q=["min","dim","maj","min","min","maj","maj"];
+const MAJ_KEYS=[R(0,0),R(1,-1),R(1,0),R(2,-1),R(2,0),R(3,0),R(3,1),R(4,0),R(5,-1),R(5,0),R(6,-1),R(6,0)];
+const MIN_KEYS=[R(0,0),R(0,1),R(1,0),R(2,-1),R(2,0),R(3,0),R(3,1),R(4,0),R(4,1),R(5,0),R(6,-1),R(6,0)];
+const PROGS=[
+ {id:"cadence",g:"yours",name:"The cadence",key:R(0,0),minor:false,loop:false,steps:[[0,"maj"],[3,"maj"],[0,"maj"],[4,"maj"],[0,"maj"]],
+  why:"Home, a step away, home, then V with its strong pull, and home again. It's how countless songs end. Watch the right hand: shared notes stay put.",songs:"Your daily routine, station ④."},
+ {id:"pop",g:"yours",name:"Pop loop",key:R(0,0),minor:false,steps:[[0,"maj"],[4,"maj"],[5,"min"],[3,"maj"]],
+  why:"Home, the pull of V, a sad turn to vi, then IV lifts you back. It loops forever.",songs:"Station ⑤ in C. Also Let It Be (The Beatles) and Don't Stop Believin' (Journey)."},
+ {id:"minorloop",g:"yours",name:"Minor loop",key:R(5,0),minor:true,steps:[[0,"min"],[5,"maj"],[2,"maj"],[6,"maj"]],
+  why:"The same four chords as the pop loop in C, started on Am, so A minor becomes home.",songs:"Station ⑤ in A minor."},
+ {id:"comptine",g:"yours",name:"Comptine",key:R(2,0),minor:true,steps:[[0,"min"],[2,"maj"],[4,"min"],[6,"maj"]],
+  why:"Rocks between minor and major chords, which gives the bittersweet, music-box feel.",songs:"Comptine d'un autre été (Yann Tiersen). Station ⑤ in E minor."},
+ {id:"river",g:"yours",name:"River Flows",key:R(5,0),minor:false,steps:[[5,"min"],[3,"maj"],[0,"maj"],[4,"maj"]],
+  why:"The pop chords started on the minor chord, so it sounds wistful rather than bright.",songs:"River Flows in You (Yiruma). Station ⑤ in A major."},
+ {id:"twofive",g:"yours",name:"Misty's ii–V–I",key:R(0,0),minor:false,steps:[[1,"m7"],[4,"dom7"],[0,"maj7"]],
+  why:"Each root falls by a 5th while the 3rds and 7ths slide by half steps. These are the guide tones from your Misty page.",songs:"Misty is full of these (it's in E♭; try that key). Also Autumn Leaves and most jazz standards."},
+ {id:"fifties",g:"common",name:"Fifties loop",key:R(0,0),minor:false,steps:[[0,"maj"],[5,"min"],[3,"maj"],[4,"maj"]],
+  why:"The doo-wop loop. It's the pop loop's chords in a different order.",songs:"Heart and Soul, Stand By Me (Ben E. King)."},
+ {id:"blues",g:"common",name:"12-bar blues",key:R(0,0),minor:false,steps:[[0,"dom7"],[0,"dom7"],[0,"dom7"],[0,"dom7"],[3,"dom7"],[3,"dom7"],[0,"dom7"],[0,"dom7"],[4,"dom7"],[3,"dom7"],[0,"dom7"],[4,"dom7"]],
+  why:"Twelve bars, three chords, all dominant 7ths. The backbone of blues and rock and roll.",songs:"Johnny B. Goode (Chuck Berry), Hound Dog."},
+ {id:"canon",g:"common",name:"Pachelbel",key:R(1,0),minor:false,steps:[[0,"maj"],[4,"maj"],[5,"min"],[2,"min"],[3,"maj"],[0,"maj"],[3,"maj"],[4,"maj"]],
+  why:"A long, graceful loop where the bass mostly steps down. Its first half is close to the pop loop.",songs:"Pachelbel's Canon in D, a wedding favourite."},
+ {id:"andalusian",g:"common",name:"Andalusian",key:R(5,0),minor:true,steps:[[0,"min"],[6,"maj"],[5,"maj"],[4,"maj"]],
+  why:"Steps straight down to a major V (note the G♯ in A minor), which gives a Spanish, flamenco flavour.",songs:"Hit the Road Jack (Ray Charles)."}
+];
+const P={prog:PROGS[0],key:PROGS[0].key,idx:0,timers:[],voiced:[]};
+function degRoot(key,deg,minor){const sc=minor?MIN_SC:MAJ_SC,l=(key.l+deg)%7,pc=(pcOf(key)+sc[deg])%12;let a=((pc-NAT[l])%12+18)%12-6;return R(l,a)}
+function roman(deg,q){let r=["I","II","III","IV","V","VI","VII"][deg];if(["min","m7","dim","m7b5","dim7","mMaj7"].includes(q))r=r.toLowerCase();
+  return r+({dim:"°",aug:"+",dom7:"7",m7:"7",maj7:"maj7",m7b5:"ø7",dim7:"°7",mMaj7:"(maj7)"}[q]||"")}
+function progChords(){return P.prog.steps.map(([d,q])=>({root:degRoot(P.key,d,P.prog.minor),q,rn:roman(d,q)}))}
+function voiceProg(chs){let prev=null;return chs.map(c=>{const n=Q[c.q].ints.length,cands=[];
+  for(let inv=0;inv<(prev?n:1);inv++){const base=chordNotes(c.root,c.q,"treble",inv);
+    for(const sh of [-1,0,1]){const v=base.map(x=>({l:x.l,a:x.a,o:x.o+sh})),ms=v.map(midiOf);
+      if(Math.min(...ms)<55||Math.max(...ms)>81)continue;
+      const cost=prev?ms.reduce((s,m,i)=>s+Math.abs(m-(i<prev.length?prev[i]:prev[prev.length-1])),0):Math.abs(ms.reduce((a,b)=>a+b,0)/n-64);
+      cands.push({v,ms,cost})}}
+  cands.sort((a,b)=>a.cost-b.cost);const best=cands[0]||{v:chordNotes(c.root,c.q,"treble"),ms:[]};prev=best.v.map(midiOf);return best.v})}
+function lhNote(c){return chordNotes(c.root,c.q,"bass")[0]}
+function buildProgPicker(){
+  ["yours","common"].forEach(g=>{$("p-"+g).innerHTML=PROGS.filter(p=>p.g===g).map(p=>'<button data-id="'+p.id+'">'+p.name+'</button>').join("");
+    $("p-"+g).querySelectorAll("button").forEach(b=>b.onclick=()=>{stopProg();P.prog=PROGS.find(p=>p.id===b.dataset.id);P.key=P.prog.key;P.idx=0;$("p-loop").checked=P.prog.loop!==false;renderProg()})});
+}
+function renderProg(){
+  const chs=progChords();P.voiced=voiceProg(chs);const c=chs[P.idx];
+  document.querySelectorAll("#p-yours button,#p-common button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.id===P.prog.id));
+  $("p-title").textContent=P.prog.name;
+  $("p-key").textContent=chs.map(x=>x.rn).join(" – ")+"  ·  key of "+nn(P.key)+(P.prog.minor?" minor":" major");
+  $("p-chips").innerHTML=chs.map((x,i)=>'<button data-i="'+i+'" aria-pressed="'+(i===P.idx)+'"><small>'+x.rn+'</small><span>'+chordName(x.root,x.q)+'</span></button>').join("");
+  $("p-chips").querySelectorAll("button").forEach(b=>b.onclick=()=>{stopProg();P.idx=+b.dataset.i;renderProg();playStep(P.idx)});
+  $("p-why").textContent=P.prog.why;$("p-songs").textContent=P.prog.songs;
+  const rh=P.voiced[P.idx],lh=lhNote(c);
+  $("p-treble").innerHTML=staffSVG(rh.map(n=>Object.assign({},n,{cls:"user"})),"treble");
+  $("p-bass").innerHTML=staffSVG([Object.assign({},lh,{cls:"lhn"})],"bass");
+  const marks={};rh.forEach(n=>marks[midiOf(n)]="user");marks[midiOf(lh)]="lh";$("p-kb").innerHTML=kbSVG(marks,{range:"prog"});
+  const keys=P.prog.minor?MIN_KEYS:MAJ_KEYS;
+  $("p-keys").innerHTML=keys.map((k,i)=>'<button data-i="'+i+'" aria-pressed="'+(pcOf(k)===pcOf(P.key))+'">'+nn(k)+(P.prog.minor?"m":"")+'</button>').join("");
+  $("p-keys").querySelectorAll("button").forEach(b=>b.onclick=()=>{stopProg();P.key=keys[+b.dataset.i];renderProg()});
+  // chords of the key
+  const qs=P.prog.minor?MIN_Q:MAJ_Q;
+  $("p-dia-title").textContent="The 7 chords of "+nn(P.key)+(P.prog.minor?" minor":" major");
+  $("p-dia-help").textContent="Each progression picks from these. Uppercase numerals are major chords, lowercase are minor, ° is diminished."+(P.prog.minor?" In minor keys, V is often made major by raising one note (E major instead of Em in A minor).":"")+" Tap one to hear it.";
+  $("p-dia").innerHTML=qs.map((q,d)=>{const r=degRoot(P.key,d,P.prog.minor);return '<button class="dia" data-d="'+d+'"><small>'+roman(d,q)+'</small><span>'+chordName(r,q)+'</span></button>'}).join("");
+  $("p-dia").querySelectorAll("button").forEach(b=>b.onclick=()=>{const d=+b.dataset.d,r=degRoot(P.key,d,P.prog.minor),q=qs[d];const ns=chordNotes(r,q,"treble");playBlock(ns.map(midiOf),midiOf(chordNotes(r,q,"bass")[0]),1.6)});
+}
+function playBlock(rhMs,lhM,dur,at){const a=actx();if(!a)return;const t=at||a.currentTime+.03;tone(lhM,t,dur+.5,.26);rhMs.forEach(m=>tone(m,t+.03,dur+.3,.14))}
+function playStep(i){const chs=progChords();playBlock(P.voiced[i].map(midiOf),midiOf(lhNote(chs[i])),1.8)}
+function stopProg(){P.timers.forEach(clearTimeout);P.timers=[];$("p-play").textContent="▶ Play"}
+function runProg(){const a=actx();if(!a)return;stopProg();const chs=progChords(),dur=4*60/$("p-bpm").value;let t=a.currentTime+.1;
+  chs.forEach((c,i)=>{playBlock(P.voiced[i].map(midiOf),midiOf(lhNote(c)),dur*.95,t);
+    P.timers.push(setTimeout(()=>{P.idx=i;renderProg()},(t-a.currentTime)*1000));t+=dur});
+  P.timers.push(setTimeout(()=>{if($("p-loop").checked)runProg();else stopProg()},(t-a.currentTime)*1000-30));
+  $("p-play").textContent="■ Stop"}
+$("p-play").onclick=()=>{if(P.timers.length)stopProg();else runProg()};
+$("p-bpm").oninput=()=>$("p-bpmv").textContent=$("p-bpm").value;
+buildProgPicker();renderProg();
 
 buildSettings();renderLearn();
 })();
