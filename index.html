@@ -67,7 +67,8 @@ svg.staff .ghost ellipse{stroke:var(--muted);stroke-dasharray:3 2}
 svg.staff .ghost .acc{fill:var(--muted)}
 .kbwrap{overflow-x:auto}
 svg.kb{display:block;width:100%;min-width:600px;height:auto}
-svg.kb.narrow{min-width:340px;max-width:620px}
+svg.kb.narrow{min-width:0;max-width:620px}
+[hidden]{display:none!important}
 svg.kb rect{cursor:default}
 svg.kb.input rect{cursor:pointer}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;color:var(--muted)}
@@ -99,7 +100,14 @@ tbody tr{cursor:pointer}
 tbody tr:hover td{background:var(--bg)}
 .mode[hidden]{display:none!important}
 footer{color:var(--muted);font-size:.82rem}
-@media (max-width:480px){.modetabs{display:grid;grid-template-columns:repeat(4,auto);width:100%}.modetabs button{padding:8px 6px;font-size:.92rem}}
+@media (max-width:480px){.modetabs{display:grid;grid-template-columns:repeat(5,auto);width:100%}.modetabs button{padding:8px 4px;font-size:.84rem}}
+.ns-head{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ns-stat{display:grid;gap:2px}
+.ns-big{font-family:var(--display);font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.ns-letters{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.ns-letters button{font-family:var(--display);font-size:1.4rem;font-weight:600;padding:12px 0;touch-action:manipulation}
+.ns-letters button.hit{background:var(--ok);border-color:var(--ok);color:var(--paper)}
+#mode-notes{display:grid;gap:12px}
 .pgroup{display:grid;gap:6px}
 .pgroup .cap,.cap{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .prog-chips button,#p-dia button{display:grid;justify-items:center;gap:0;min-width:56px;padding:6px 10px;line-height:1.2}
@@ -116,6 +124,7 @@ details.keypick summary{cursor:pointer;color:var(--muted);font-weight:500}
   <h1>Chord Lab</h1>
   <div class="tabs modetabs" role="tablist" aria-label="Mode">
     <button id="tab-learn" role="tab" aria-pressed="true">Learn</button>
+    <button id="tab-notes" role="tab" aria-pressed="false">Notes</button>
     <button id="tab-build" role="tab" aria-pressed="false">Build it</button>
     <button id="tab-name" role="tab" aria-pressed="false">Name it</button>
     <button id="tab-prog" role="tab" aria-pressed="false">Progressions</button>
@@ -209,6 +218,35 @@ details.keypick summary{cursor:pointer;color:var(--muted);font-weight:500}
       <button class="primary" id="n-check" disabled>Check</button>
       <button id="n-hear">▶ Hear it</button>
       <button id="n-next">Next chord →</button>
+    </div>
+  </div>
+</section>
+
+<!-- NOTE SPRINT -->
+<section class="mode" id="mode-notes" hidden>
+  <details class="settings" id="ns-settings">
+    <summary>Sprint settings</summary>
+    <div class="setgrid">
+      <fieldset><legend>Clef</legend><div class="chips" id="ns-clef"></div></fieldset>
+      <fieldset><legend>Notes</legend><div class="chips" id="ns-range"></div></fieldset>
+      <fieldset><legend>Answer with</legend><div class="chips" id="ns-answer"></div></fieldset>
+      <fieldset><legend>Extras</legend><div class="chips"><label><input type="checkbox" id="ns-acc"> Sharps &amp; flats (piano keys only)</label><label><input type="checkbox" id="ns-sound"> Play each note</label></div></fieldset>
+    </div>
+  </details>
+  <div class="panel">
+    <div class="ns-head">
+      <div class="ns-stat"><span class="cap">Time</span><span class="ns-big" id="ns-time">60</span></div>
+      <div class="ns-stat"><span class="cap">Score</span><span class="ns-big" id="ns-score">0</span></div>
+      <div class="ns-stat"><span class="cap">Best</span><span class="ns-big muted" id="ns-best">–</span></div>
+    </div>
+    <div class="staffbox"><span class="cap" id="ns-clefcap"></span><div id="ns-staff"></div></div>
+    <div id="ns-letters" class="ns-letters"></div>
+    <div class="kbwrap" id="ns-kb"></div>
+    <div class="feedback" id="ns-fb"></div>
+    <div class="row">
+      <button class="primary" id="ns-start">▶ Start 60-second sprint</button>
+      <button id="ns-practice">Practice, no timer</button>
+      <button id="ns-stop" hidden>Stop</button>
     </div>
   </div>
 </section>
@@ -374,10 +412,10 @@ function randomChord(prev){
 
 // ---------- modes ----------
 let mode="learn";
-function setMode(m){mode=m;if(m!=="prog"&&typeof stopProg==="function")stopProg();["learn","build","name","prog"].forEach(k=>{$("tab-"+k).setAttribute("aria-pressed",k===m);$("mode-"+k).hidden=k!==m});
-  $("settings").hidden=m==="learn"||m==="prog";
+function setMode(m){mode=m;if(m!=="prog"&&typeof stopProg==="function")stopProg();if(m!=="notes"&&typeof nsStop==="function")nsStop(true);["learn","notes","build","name","prog"].forEach(k=>{$("tab-"+k).setAttribute("aria-pressed",k===m);$("mode-"+k).hidden=k!==m});
+  $("settings").hidden=!(m==="build"||m==="name");
   if(m==="build"&&!B.c)newBuild();if(m==="name"&&!N.c){buildNameButtons();newName()}}
-["learn","build","name","prog"].forEach(k=>$("tab-"+k).onclick=()=>setMode(k));
+["learn","notes","build","name","prog"].forEach(k=>$("tab-"+k).onclick=()=>setMode(k));
 
 // ----- LEARN -----
 const L={root:R(0,0),q:"maj7"};
@@ -510,6 +548,79 @@ $("n-check").onclick=()=>{
 };
 $("n-hear").onclick=()=>playMidis(N.notes.map(midiOf));
 $("n-next").onclick=newName;
+
+// ----- NOTE SPRINT -----
+S.ns=Object.assign({clef:"bass",range:"staff",answer:"letters",acc:false,sound:true},S.ns||{});
+const NSS={run:false,timed:false,end:0,score:0,tries:0,note:null,clef:"bass",shownAt:0,times:[],misses:{},timer:null,lock:false,flash:null};
+function nsChips(id,name,opts,key){$(id).innerHTML=opts.map(([v,l])=>'<label><input type="radio" name="'+name+'" id="'+name+'-'+v+'" '+(S.ns[key]===v?"checked":"")+'> '+l+'</label>').join("");
+  opts.forEach(([v])=>$(name+"-"+v).onchange=()=>{S.ns[key]=v;if(key==="answer"&&v==="letters")S.ns.acc=false;save();nsStop(true);nsRenderSettings();nsNext()})}
+function nsRenderSettings(){
+  nsChips("ns-clef","nsc",[["treble","Treble"],["bass","Bass"],["both","Both"]],"clef");
+  nsChips("ns-range","nsr",[["staff","On the staff"],["ledger","Add ledger lines"]],"range");
+  nsChips("ns-answer","nsa",[["letters","Letter names"],["keys","Piano keys"]],"answer");
+  $("ns-acc").checked=S.ns.acc;$("ns-acc").disabled=S.ns.answer!=="keys";
+  $("ns-acc").onchange=e=>{S.ns.acc=e.target.checked;save();nsStop(true);nsNext()};
+  $("ns-sound").checked=S.ns.sound;$("ns-sound").onchange=e=>{S.ns.sound=e.target.checked;save()};
+}
+const nsBestKey=()=>[S.ns.clef,S.ns.range,S.ns.answer,S.ns.acc?"acc":"nat"].join("-");
+function nsBest(){try{return JSON.parse(localStorage.getItem("chordLabBest")||"{}")[nsBestKey()]}catch(e){return undefined}}
+function nsSaveBest(v){try{const b=JSON.parse(localStorage.getItem("chordLabBest")||"{}");b[nsBestKey()]=v;localStorage.setItem("chordLabBest",JSON.stringify(b))}catch(e){}}
+function nsRange(clef){return S.ns.range==="staff"?(clef==="treble"?[30,38]:[18,26]):(clef==="treble"?[28,42]:[14,28])}
+function nsNext(){
+  const clef=S.ns.clef==="both"?(Math.random()<.5?"treble":"bass"):S.ns.clef,[lo,hi]=nsRange(clef);let n,tries=0;
+  do{const d=lo+Math.floor(Math.random()*(hi-lo+1));n={l:((d%7)+7)%7,o:Math.floor(d/7),a:0};
+    if(S.ns.acc&&S.ns.answer==="keys"&&Math.random()<.35){const a=Math.random()<.5?-1:1;if(!((n.l===2||n.l===6)&&a===1)&&!((n.l===0||n.l===3)&&a===-1))n.a=a}
+  }while(NSS.note&&midiOf(n)===midiOf(NSS.note)&&++tries<20);
+  NSS.note=n;NSS.clef=clef;NSS.shownAt=performance.now();NSS.flash=null;NSS.lock=false;nsRender();
+}
+function nsRender(){
+  const n=NSS.note;if(!n)return;
+  $("ns-clefcap").textContent=NSS.clef+" clef";
+  $("ns-staff").innerHTML=staffSVG([Object.assign({},n,{cls:NSS.flash||""})],NSS.clef);
+  $("ns-letters").hidden=S.ns.answer!=="letters";$("ns-kb").hidden=S.ns.answer!=="keys";
+  if(S.ns.answer==="letters"){
+    $("ns-letters").innerHTML=LET.map((L,i)=>'<button data-l="'+i+'" class="'+(NSS.flash&&i===n.l?"hit":"")+'">'+L+'</button>').join("");
+    $("ns-letters").querySelectorAll("button").forEach(b=>b.onclick=()=>nsAnswer(+b.dataset.l===n.l&&n.a===0));
+  }else{
+    const marks={};if(NSS.flash)marks[midiOf(n)]="ok";if(NSS.flash==="bad"&&NSS.wrong!==undefined)marks[NSS.wrong]="bad";
+    $("ns-kb").innerHTML=kbSVG(marks,{input:true,range:NSS.clef});
+    $("ns-kb").querySelectorAll("rect").forEach(r=>r.onclick=()=>{NSS.wrong=+r.dataset.m;nsAnswer(+r.dataset.m===midiOf(n))});
+  }
+  $("ns-score").textContent=NSS.score;const b=nsBest();$("ns-best").textContent=b===undefined?"–":b;
+}
+function nsAnswer(ok){
+  if(NSS.lock)return;const n=NSS.note;
+  if(S.ns.sound)tone(midiOf(n),actx()?ac.currentTime+.01:0,.7,.2);
+  if(!NSS.run){nsStart(false)}
+  NSS.tries++;
+  if(ok){NSS.score++;NSS.times.push(performance.now()-NSS.shownAt);NSS.flash="ok";NSS.lock=true;nsRender();setTimeout(()=>{if(NSS.run)nsNext()},180)}
+  else{const k=nn(n)+(n.o);NSS.misses[k]=(NSS.misses[k]||0)+1;NSS.flash="bad";NSS.lock=true;nsRender();
+    $("ns-fb").className="feedback bad";$("ns-fb").textContent="That was "+nn(n)+" ("+nn(n)+n.o+").";
+    setTimeout(()=>{$("ns-fb").textContent="";$("ns-fb").className="feedback";if(NSS.run)nsNext()},900)}
+}
+function nsStart(timed){
+  NSS.run=true;NSS.timed=timed;NSS.score=0;NSS.tries=0;NSS.times=[];NSS.misses={};NSS.end=performance.now()+60000;
+  $("ns-fb").textContent="";$("ns-fb").className="feedback";$("ns-settings").open=false;
+  $("ns-start").hidden=true;$("ns-practice").hidden=true;$("ns-stop").hidden=false;
+  clearInterval(NSS.timer);
+  if(timed){NSS.timer=setInterval(()=>{const left=Math.max(0,Math.ceil((NSS.end-performance.now())/1000));$("ns-time").textContent=left;if(left<=0)nsStop(false,true)},200)}
+  else $("ns-time").textContent="∞";
+  nsNext();
+}
+function nsStop(silent,finished){
+  const was=NSS.run;NSS.run=false;clearInterval(NSS.timer);
+  $("ns-start").hidden=false;$("ns-practice").hidden=false;$("ns-stop").hidden=true;$("ns-time").textContent="60";
+  if(!was||silent)return;
+  let msg="<b>"+NSS.score+" correct</b> out of "+NSS.tries;
+  if(NSS.times.length)msg+=", averaging "+(NSS.times.reduce((a,b)=>a+b,0)/NSS.times.length/1000).toFixed(1)+" s per note";
+  msg+=".";
+  if(NSS.timed&&finished){const b=nsBest();if(b===undefined||NSS.score>b){nsSaveBest(NSS.score);msg+=" New best!"}}
+  const tough=Object.entries(NSS.misses).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  if(tough.length)msg+=" Notes to review: "+tough.map(([k,v])=>k+(v>1?" (×"+v+")":"")).join(", ")+".";
+  $("ns-fb").className="feedback "+(NSS.tries&&NSS.score/NSS.tries>=.9?"ok":"info");$("ns-fb").innerHTML=msg;nsRender();
+}
+$("ns-start").onclick=()=>nsStart(true);$("ns-practice").onclick=()=>nsStart(false);$("ns-stop").onclick=()=>nsStop(false);
+nsRenderSettings();nsNext();
 
 // ----- PROGRESSIONS -----
 const MAJ_SC=[0,2,4,5,7,9,11],MIN_SC=[0,2,3,5,7,8,10];
